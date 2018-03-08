@@ -100,10 +100,10 @@ class BayesianOptimization(BO):
         self.batch_size = batch_size
         self.num_cores = num_cores
         if f is not None:
-            self.f = self._sign(f)
-            self.objective = SingleObjective(self.f, self.batch_size,self.objective_name)
+            self.score_func = self._wrap_func(f)
+            self.objective = SingleObjective(self.score_func, self.batch_size,self.objective_name)
         else:
-            self.f = None
+            self.score_func = None
             self.objective = None
 
         # --- CHOOSE the cost model
@@ -183,7 +183,7 @@ class BayesianOptimization(BO):
         """
 
         # If objective function was not provided, we require some initial sample data
-        if self.f is None and (self.X is None or self.Y is None):
+        if self.score_func is None and (self.X is None or self.Y is None):
             raise InvalidConfigError("Initial data for both X and Y is required when objective function is not provided")
 
         # Case 1:
@@ -194,8 +194,14 @@ class BayesianOptimization(BO):
         elif self.X is not None and self.Y is None:
             self.Y, _ = self.objective.evaluate(self.X)
 
-    def _sign(self,f):
-         if self.maximize:
-             f_copy = f
-             def f(x):return -f_copy(x)
-         return f
+    def _wrap_func(self, f):
+        f_copy = f
+
+        def f(x):
+            params = self.space.vec2params(x)
+            score = f_copy(params)
+            if self.maximize:
+                score = -score
+            return score
+
+        return f

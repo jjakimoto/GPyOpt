@@ -43,7 +43,7 @@ class RandomDesign(ExperimentDesign):
         for (idx, var) in enumerate(self.space.space_expanded):
             if isinstance(var, DiscreteVariable) or isinstance(var, CategoricalVariable) :
                 sample_var = np.atleast_2d(np.random.choice(var.domain, init_points_count))
-                samples[:,idx] = sample_var.flatten()
+                samples[:, idx] = sample_var.flatten()
 
             # sample in the case of bandit variables
             elif isinstance(var, BanditVariable):

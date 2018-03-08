@@ -13,6 +13,9 @@ class Variable(object):
     def is_continuous(self):
         return False
 
+    def is_bandit(self):
+        return False
+
     def expand(self):
         """
         Builds a list of single dimensional variables representing current variable.
@@ -81,21 +84,43 @@ class Variable(object):
         raise NotImplementedError()
 
 
-class ContinuousVariable(Variable):
-    def __init__(self, name, domain, dimensionality=1):
-        super(ContinuousVariable, self).__init__(name, 'continuous', domain, dimensionality)
+class NumericalVariable(Variable):
+    def __init__(self, name, var_type, domain, dimensionality, scale=None):
+        super(NumericalVariable, self).__init__(name, var_type, domain, dimensionality)
+        if scale == 'log':
+            self._domain = (np.log10(domain[0]), np.log10(domain[1]))
+        else:
+            self._domain = domain
+        self.scale = scale
 
     def get_bounds(self):
-        return [self.domain] * self.dimensionality
+        return [self._domain] * self.dimensionality
 
     def is_continuous(self):
         return True
 
-    def is_bandit(self):
-        return False
-
     def get_possible_values(self):
         raise AttributeError("Impossible to produce a list of values for continuous variable " + self.name)
+
+    def objective_to_model(self, x_objective):
+        """
+        Translates objective input to model input
+        with respect to current variable
+        """
+        if self.scale == "log":
+            x_objective = np.log10(x_objective)
+        return [x_objective]
+
+    def model_to_objective(self, x_model, index_in_model):
+        """
+        Translates model input to objective input
+        with respect to current variable
+        """
+
+        val = x_model[0][index_in_model]
+        if self.scale == 'log':
+            val = 10 ** val
+        return self.round([val])
 
     def round(self, value_array):
         """
@@ -112,8 +137,29 @@ class ContinuousVariable(Variable):
             rounded_value = min_value
         elif rounded_value > max_value:
             rounded_value = max_value
-
         return [rounded_value]
+
+
+class ContinuousVariable(NumericalVariable):
+    def __init__(self, name, domain, dimensionality=1, scale=None):
+        super(ContinuousVariable, self).__init__(name, 'continuous', domain, dimensionality, scale)
+
+
+class IntegerVariable(NumericalVariable):
+    def __init__(self, name, domain, dimensionality=1, scale=None):
+        super(IntegerVariable, self).__init__(name, 'integer', domain, dimensionality, scale)
+
+    def round(self, value_array):
+        """
+        If value falls within bounds, just return it
+        otherwise return min or max, whichever is closer to the value
+        Assumes an 1d array with a single element as an input.
+        """
+        val = super(IntegerVariable, self).round(value_array)[0]
+        if np.isfinite(val):
+            return [int(round(val))]
+        else:
+            return [val]
 
 
 class BanditVariable(Variable):
@@ -169,9 +215,6 @@ class DiscreteVariable(Variable):
     def get_possible_values(self):
         return self.domain
 
-    def is_bandit(self):
-        return False
-
     def round(self, value_array):
         """
         Rounds a discrete variable by selecting the closest point in the domain
@@ -186,8 +229,12 @@ class DiscreteVariable(Variable):
 
         return [rounded_value]
 
+
 class CategoricalVariable(Variable):
-    def __init__(self, name, domain, dimensionality = 1):
+    def __init__(self, name, domain, dimensionality=1):
+        self._domain = deepcopy(domain)
+        # Use index domain for computation
+        domain = list(range(len(domain)))
         super(CategoricalVariable, self).__init__(name, 'categorical', domain, dimensionality)
 
     def expand(self):
@@ -198,33 +245,39 @@ class CategoricalVariable(Variable):
 
     def objective_to_model(self, x_objective):
         entry = [0] * self.dimensionality_in_model
-        entry[int(x_objective)] = 1
+        entry[int(x_objective)] = 1.
         return entry
 
     def model_to_objective(self, x_model, index_in_model):
         vardim = self.dimensionality_in_model
-        original_entry = x_model[0, index_in_model:(index_in_model+vardim)]
+        original_entry = np.array(x_model[0][index_in_model:(index_in_model + vardim)])
         entry = sum(x * y for x, y in zip(range(vardim), original_entry))
+        entry = self.domain[int(entry)]
         return [entry]
 
+    def name_to_index(self, name):
+        idx = list(self._domain).index(name)
+        return idx
+
+    def index_to_name(self, idx):
+        name = self._domain[int(idx)]
+        return name
+
     def get_bounds(self):
-        return [(0,1)] * self.dimensionality_in_model
+        return [(0.0, 1.)] * self.dimensionality_in_model
 
     def get_possible_values(self):
         return np.eye(len(self.domain))
-
-    def is_bandit(self):
-        return False
 
     def round(self, value_array):
         """
         Rounds a categorical variable by setting to one the max of the given vector and to zero the rest of the entries.
         Assumes an 1x[number of categories] array (due to one-hot encoding) as an input
         """
-
         rounded_values = np.zeros(value_array.shape)
         rounded_values[np.argmax(value_array)] = 1
         return rounded_values
+
 
 
 def create_variable(descriptor):
@@ -232,7 +285,9 @@ def create_variable(descriptor):
     Creates a variable from a dictionary descriptor
     """
     if descriptor['type'] == 'continuous':
-        return ContinuousVariable(descriptor['name'], descriptor['domain'], descriptor.get('dimensionality', 1))
+        return ContinuousVariable(descriptor['name'], descriptor['domain'], descriptor.get('dimensionality', 1), descriptor.get('scale', None))
+    elif descriptor['type'] == 'integer':
+        return IntegerVariable(descriptor['name'], descriptor['domain'], descriptor.get('dimensionality', 1), descriptor.get('scale', None))
     elif descriptor['type'] == 'bandit':
         return BanditVariable(descriptor['name'], descriptor['domain'], descriptor.get('dimensionality', None))  # bandits variables cannot be repeated
     elif descriptor['type'] == 'discrete':

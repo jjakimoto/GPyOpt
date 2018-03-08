@@ -246,8 +246,7 @@ class BO(object):
                 elif normalization_type == 'maxmin':
                     Y_inmodel = (self.Y - self.Y.min())/(self.Y.max()-self.Y.min())
             else:
-                Y_inmodel =self.Y
-
+                Y_inmodel = self.Y
             self.model.updateModel(X_inmodel, Y_inmodel, None, None)
 
         ### --- Save parameters of the model

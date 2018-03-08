@@ -98,6 +98,39 @@ class Design_space(object):
             d['domain'] = literal_eval(d['domain'])
         return Design_space(space, None if len(constraints)==0 else constraints)
 
+    def params2vec(self, params):
+        # Not include fixed params
+        vec = []
+        for conf, var in zip(self.config_space_expanded, self.space_expanded):
+            val = params[conf['name']]
+            if hasattr(var, 'name_to_index'):
+                val = var.name_to_index(val)
+            vec.append(val)
+        return vec
+
+    def vec2params(self, vec):
+        # Not include fixed params
+        params = {}
+        for i, val in enumerate(vec[0]):
+            conf = self.config_space_expanded[i]
+            var = self.space_expanded[i]
+            if hasattr(var, 'index_to_name'):
+                val = var.index_to_name(val)
+            params[conf["name"]] = val
+        return params
+
+    def params2model_vec(self, params):
+        # Not include fixed params
+        vec = self.params2vec(params)
+        vec = self.objective_to_model([vec])
+        return np.array(vec)
+
+    def model_vec2params(self, vec):
+        # Not include fixed params
+        vec = self.model_to_objective([vec])
+        params = self.vec2params(vec)
+        return params
+
     def _expand_config_space(self):
         """
         Expands the config input space into a list of diccionaries, one for each variable_dic
@@ -212,7 +245,7 @@ class Design_space(object):
 
         for k in range(self.objective_dimensionality):
             variable = self.space_expanded[k]
-            new_entry = variable.objective_to_model(x_objective[0,k])
+            new_entry = variable.objective_to_model(x_objective[0][k])
             x_model += new_entry
 
         return x_model
