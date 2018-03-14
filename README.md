@@ -1,13 +1,13 @@
-# Custom GPyOpt
+# Modified GPyOpt
 
-Modify the interface of [GPyOpt](https://github.com/SheffieldML/GPyOpt).
+[GPyOpt](https://github.com/SheffieldML/GPyOpt) with modified interface
 
 
 ### Modifications
-- Objective function takes dictionary input
-- Add `search` functions which returns optimal value in the dictionary
-    format after `run_optimiazation`.
-- Add continuous variables
+- Objective function has to take dictionary input
+- Add `search` function which returns optimal input as a dictionary
+    after `run_optimiazation`.
+- Add `continuous` option to the `type` attribute for search space
 
 
 
