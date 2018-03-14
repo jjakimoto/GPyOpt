@@ -75,7 +75,7 @@ class BayesianOptimization(BO):
     def __init__(self, f, domain = None, constraints = None, cost_withGradients = None, model_type = 'GP', X = None, Y = None,
     	initial_design_numdata = 5, initial_design_type='random', acquisition_type ='EI', normalize_Y = True,
         exact_feval = False, acquisition_optimizer_type = 'lbfgs', model_update_interval=1, evaluator_type = 'sequential',
-        batch_size = 1, num_cores = 1, verbosity=False, verbosity_model = False, maximize=False, de_duplication=False, **kwargs):
+        batch_size = 1, num_cores = 1, verbosity=False, verbosity_model = False, de_duplication=False, **kwargs):
 
         self.modular_optimization = False
         self.initial_iter = True
@@ -94,7 +94,6 @@ class BayesianOptimization(BO):
         self.space = Design_space(self.domain, self.constraints)
 
         # --- CHOOSE objective function
-        self.maximize = maximize
         if 'objective_name' in kwargs: self.objective_name = kwargs['objective_name']
         else: self.objective_name = 'no_name'
         self.batch_size = batch_size
@@ -200,8 +199,5 @@ class BayesianOptimization(BO):
         def f(x):
             params = self.space.vec2params(x)
             score = f_copy(params)
-            if self.maximize:
-                score = -score
             return score
-
         return f
